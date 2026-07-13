@@ -1,6 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Route, Switch } from "wouter";
+import { Route, Switch, Router as WouterRouter } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -60,13 +60,16 @@ function Router() {
 }
 
 function App() {
+  const base = import.meta.env.DEV ? "" : "/teacherPortal";
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light" switchable={true}>
         <AuthProvider>
           <TooltipProvider>
             <Toaster position="top-center" richColors />
-            <Router />
+            <WouterRouter base={base}>
+              <Router />
+            </WouterRouter>
           </TooltipProvider>
         </AuthProvider>
       </ThemeProvider>

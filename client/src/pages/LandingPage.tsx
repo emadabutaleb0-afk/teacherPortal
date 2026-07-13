@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { getLoginUrl } from "@/const";
+import { getLoginUrl, getRelativePath } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -87,8 +87,8 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (!loading && isAuthenticated && user) {
-      if (user.role === "admin") window.location.href = "/teacher";
-      else window.location.href = "/student";
+      if (user.role === "admin") window.location.href = getRelativePath("/teacher");
+      else window.location.href = getRelativePath("/student");
     }
   }, [loading, isAuthenticated, user]);
 
@@ -254,7 +254,7 @@ export default function LandingPage() {
             <Button
               size="sm"
               className="shadow-sm hover:scale-[1.02] transition-transform text-xs sm:text-sm"
-              onClick={() => (window.location.href = "/signin")}
+              onClick={() => (window.location.href = getRelativePath("/signin"))}
             >
               {curr.login}
             </Button>
@@ -353,7 +353,7 @@ export default function LandingPage() {
                 <Button
                   size="lg"
                   className="text-base px-8 gap-2 shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all duration-300 hover:scale-[1.02]"
-                  onClick={() => (window.location.href = "/signin")}
+                  onClick={() => (window.location.href = getRelativePath("/signin"))}
                 >
                   <Play className="w-5 h-5" />
                   {curr.startLearning}
@@ -474,7 +474,7 @@ export default function LandingPage() {
                 >
                   <Card 
                     className="h-full border-border/60 hover:border-primary/40 hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer hover:scale-[1.01]"
-                    onClick={() => (window.location.href = "/signin")}
+                    onClick={() => (window.location.href = getRelativePath("/signin"))}
                   >
                     <div className="h-28 w-full overflow-hidden relative">
                       <img 
@@ -628,7 +628,7 @@ export default function LandingPage() {
                 size="lg"
                 variant="secondary"
                 className="text-base px-10 gap-2 shadow-xl"
-                onClick={() => (window.location.href = "/signin")}
+                onClick={() => (window.location.href = getRelativePath("/signin"))}
               >
                 <GraduationCap className="w-5 h-5" />
                 {curr.loginNow}
@@ -637,7 +637,7 @@ export default function LandingPage() {
                 size="lg"
                 variant="outline"
                 className="text-base px-8 gap-2 border-white/30 text-white hover:bg-white/10"
-                onClick={() => (window.location.href = "/register")}
+                onClick={() => (window.location.href = getRelativePath("/register"))}
               >
                 <ArrowLeft className={`w-5 h-5 ${lang === "ar" ? "" : "rotate-180"}`} />
                 {curr.registerHere}

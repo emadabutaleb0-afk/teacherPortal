@@ -15,6 +15,7 @@ import {
   BookOpen, Zap, Shield, ArrowRight, Loader2, Receipt, Star
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { getRelativePath } from "@/const";
 
 type PayMethod = "fawry" | "vodafone" | "coupon";
 type PlanId = "session" | "term";
@@ -49,7 +50,7 @@ export default function StudentWallet() {
     </div>
   );
 
-  if (!isAuthenticated) { window.location.href = "/signin"; return null; }
+  if (!isAuthenticated) { window.location.href = getRelativePath("/signin"); return null; }
 
   const sessionPrice = parseFloat(settings?.sessionPrice ?? "80");
   const termPrice = parseFloat(settings?.termPrice ?? "800");

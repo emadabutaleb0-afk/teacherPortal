@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { getLoginUrl } from "@/const";
+import { getLoginUrl, getRelativePath } from "@/const";
 import { trpc } from "@/lib/trpc";
 import NotificationBell from "@/components/portal/NotificationBell";
 import { GraduationCap, Home, LogOut, User, Wallet, Sun, Moon, Globe } from "lucide-react";
@@ -37,7 +37,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
       logout();
-      window.location.href = "/";
+      window.location.href = getRelativePath("/");
     },
   });
 
@@ -127,7 +127,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
               variant="ghost"
               size="icon"
               className="w-8 h-8 text-muted-foreground hover:text-foreground"
-              onClick={() => window.location.href = "/"}
+              onClick={() => window.location.href = getRelativePath("/")}
               title={lang === "ar" ? "الرئيسية" : "Home"}
             >
               <Home className="w-4 h-4" />

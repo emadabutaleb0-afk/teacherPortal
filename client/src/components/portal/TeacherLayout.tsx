@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { getLoginUrl } from "@/const";
+import { getLoginUrl, getRelativePath } from "@/const";
 import { trpc } from "@/lib/trpc";
 import NotificationBell from "@/components/portal/NotificationBell";
 import {
@@ -69,7 +69,7 @@ export default function TeacherLayout({ children, title }: TeacherLayoutProps) {
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
       logout();
-      window.location.href = "/";
+      window.location.href = getRelativePath("/");
     },
   });
 
@@ -92,7 +92,7 @@ export default function TeacherLayout({ children, title }: TeacherLayoutProps) {
   }
 
   if (user?.role !== "admin" && user?.role !== "teacher" && user?.role !== "superadmin") {
-    window.location.href = "/student";
+    window.location.href = getRelativePath("/student");
     return null;
   }
 
@@ -443,7 +443,7 @@ export default function TeacherLayout({ children, title }: TeacherLayoutProps) {
               variant="ghost"
               size="icon"
               className="w-9 h-9 text-muted-foreground hover:text-foreground"
-              onClick={() => window.location.href = "/"}
+              onClick={() => window.location.href = getRelativePath("/")}
               title={lang === "ar" ? "الرئيسية" : "Home"}
             >
               <Home className="w-5 h-5" />

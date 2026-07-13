@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getLoginUrl } from "@/const";
+import { getLoginUrl, getRelativePath } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -52,7 +52,7 @@ export default function SignInPage() {
 
   useEffect(() => {
     if (!loading && isAuthenticated && user) {
-      window.location.href = (user.role === "admin" || user.role === "teacher" || user.role === "superadmin") ? (user.role === "superadmin" ? "/teacher/settings" : "/teacher") : "/student";
+      window.location.href = getRelativePath((user.role === "admin" || user.role === "teacher" || user.role === "superadmin") ? (user.role === "superadmin" ? "/teacher/settings" : "/teacher") : "/student");
     }
   }, [loading, isAuthenticated, user]);
 
