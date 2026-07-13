@@ -24,25 +24,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: "pnpm"
+          node-version: 22
 
       - name: Install dependencies
-        run: pnpm install --ignore-scripts
+        run: npm install --legacy-peer-deps --ignore-scripts
         env:
-          # Skip optional/private packages that require Manus platform
-          SKIP_MANUS: true
+          npm_config_optional: false
 
-      - name: Build for production (GitHub Pages)
-        run: pnpm exec vite build --config vite.config.prod.ts
+      - name: Build for GitHub Pages
+        run: npx vite build --config vite.config.prod.ts
         env:
           NODE_ENV: production
 
