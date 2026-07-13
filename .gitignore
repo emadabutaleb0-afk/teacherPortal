@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.manus-logs
+extracted_zip
+*.zip
+.gemini
+lms-portal-builder-dir
+out.html
+out.js

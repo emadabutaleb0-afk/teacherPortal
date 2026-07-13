@@ -1,0 +1,25 @@
+Here are the links and credentials for each role in the system:
+
+1. Teacher (Portal Admin / Tenant Owner)
+This account owns and manages the default teacher portal (ahmed-mahmoud).
+
+Link: http://ahmed-mahmoud.localhost:3000/signin (or http://engportal-vasxkdjs.manus.space/signin in your container environment)
+Username/Email: teacher@engportal.com
+Password: password (Note: You can also use the "Quick Demo Login: Teacher" button on the sign-in page to log in instantly).
+
+
+2. Student
+This account belongs to a student enrolled in the default teacher's portal.
+
+Link: http://ahmed-mahmoud.localhost:3000/signin 
+(or http://engportal-vasxkdjs.manus.space/signin 
+in your container environment)
+Username/Email: student@engportal.com
+Password: password (Note: You can also use the "Quick Demo Login: Student" button on the sign-in page to log in instantly).
+
+
+3. Super-Admin (Platform Operator / Seeding)
+The platform-level administration (such as creating new subdomains and setting up new teacher portal settings) is managed via the database or seeding scripts for this version.
+
+Link: Access to the database shell / seeding scripts on the container engportal-vasxkdjs.manus.space.
+Database Credentials: Configured via the DATABASE_URL environment variable.
