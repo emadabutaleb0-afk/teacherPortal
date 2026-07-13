@@ -17,6 +17,7 @@ import {
   BookOpen, ChevronDown, ChevronUp, Edit, FileText,
   GraduationCap, Link2, Loader2, Paperclip, Plus, Trash2, Video,
 } from "lucide-react";
+import { getWAConfig, sendWhatsAppBulk, WA_TEMPLATES, normalizePhone } from "@/lib/whatsapp";
 
 const GRADE_OPTIONS = [
   "الصف الأول الثانوي",
@@ -352,6 +353,8 @@ export default function TeacherCurriculum() {
   const utils = trpc.useUtils();
   const { data: units, isLoading } = trpc.units.list.useQuery();
   const { data: gradeLevels } = trpc.units.gradeLevels.useQuery();
+  const { data: settings } = trpc.settings.get.useQuery();
+  const { data: studentsList } = trpc.students.list.useQuery();
   const [expandedUnit, setExpandedUnit] = useState<number | null>(null);
   const [expandedMaterials, setExpandedMaterials] = useState<number | null>(null);
   const [unitDialog, setUnitDialog] = useState(false);
@@ -424,10 +427,29 @@ export default function TeacherCurriculum() {
   });
 
   const createLesson = trpc.lessons.create.useMutation({
-    onSuccess: () => {
+    onSuccess: async (newLesson: any) => {
       utils.lessons.listByUnit.invalidate();
       setLessonDialog(false);
       toast.success(curr.successCreateLesson);
+
+      // ── WhatsApp notification to all students ──────────────────────────
+      const waConf = getWAConfig();
+      if (waConf.enabled && studentsList && units) {
+        const unit = units.find((u: any) => u.id === selectedUnitId);
+        const unitTitle  = unit?.titleAr ?? unit?.titleEn ?? 'وحدة';
+        const lessonTitle = newLesson?.titleAr ?? newLesson?.titleEn ?? 'درس جديد';
+        const teacherName = settings?.teacherName ?? 'الأستاذ';
+        const message = WA_TEMPLATES.newLesson(teacherName, unitTitle, lessonTitle);
+        const phones = (studentsList as any[])
+          .map((s: any) => s.phone)
+          .filter(Boolean)
+          .map(normalizePhone);
+        if (phones.length > 0) {
+          toast.info(`📱 جاري إرسال إشعار WhatsApp لـ ${phones.length} طالب...`);
+          const { sent, failed } = await sendWhatsAppBulk(phones, message);
+          toast.success(`✅ تم إرسال WhatsApp لـ ${sent} طالب${failed > 0 ? ` (${failed} فشل)` : ''}`);
+        }
+      }
     },
     onError: (e: any) => toast.error(e.message),
   });

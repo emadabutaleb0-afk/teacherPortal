@@ -14,13 +14,56 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
   Settings, Save, Lock, CreditCard, Video, DollarSign,
-  Shield, Info, ExternalLink, Eye, EyeOff, Upload, UserPlus, Key
+  Shield, Info, ExternalLink, Eye, EyeOff, Upload, UserPlus, Key,
+  MessageCircle, Send, CheckCircle2, Loader2
 } from "lucide-react";
+import { getWAConfig, saveWAConfig, sendWhatsApp, sendWhatsAppBulk, WA_TEMPLATES, normalizePhone } from "@/lib/whatsapp";
 
 export default function TeacherSettings() {
+  // ── WhatsApp state ────────────────────────────────────────────────────────
+  const [waConfig, setWaConfig] = useState({
+    instanceId: '',
+    token: '',
+    enabled: false,
+    teacherPhone: '',
+  });
+  const [waTokenVisible, setWaTokenVisible] = useState(false);
+  const [waTesting, setWaTesting] = useState(false);
+  const [waTestSent, setWaTestSent] = useState(false);
+
+  useEffect(() => {
+    setWaConfig(getWAConfig());
+  }, []);
+
+  const handleSaveWA = () => {
+    saveWAConfig(waConfig);
+    toast.success('تم حفظ إعدادات WhatsApp بنجاح ✅');
+  };
+
+  const handleTestWA = async () => {
+    if (!waConfig.teacherPhone) {
+      toast.error('أدخل رقم هاتفك أولاً لاستقبال رسالة الاختبار');
+      return;
+    }
+    setWaTesting(true);
+    saveWAConfig(waConfig); // save before test
+    const ok = await sendWhatsApp(
+      normalizePhone(waConfig.teacherPhone),
+      WA_TEMPLATES.welcome('مدرس', settings?.teacherName ?? 'أستاذ أحمد')
+    );
+    setWaTesting(false);
+    if (ok) {
+      setWaTestSent(true);
+      toast.success('✅ تم إرسال رسالة الاختبار على WhatsApp بنجاح!');
+      setTimeout(() => setWaTestSent(false), 4000);
+    } else {
+      toast.error('فشل إرسال رسالة الاختبار — تحقق من البيانات');
+    }
+  };
   const utils = trpc.useUtils();
   const { user, addUser } = useAuth();
   const { data: settings, isLoading } = trpc.settings.get.useQuery();
+  const { data: studentsList } = trpc.students.list.useQuery();
 
   // Teacher-editable fields
   const [teacherForm, setTeacherForm] = useState({
@@ -92,12 +135,32 @@ export default function TeacherSettings() {
   });
 
   const handleSaveTeacher = () => updateSettings.mutate(teacherForm);
-  const handleSaveAdmin = () => updateWhiteLabel.mutate(adminForm);
-  const handleSaveLive = () => updateSettings.mutate({
-    liveRoomUrl: liveForm.liveRoomUrl,
-    liveRoomTitle: liveForm.liveRoomTitle,
-    liveRoomEnabled: liveForm.liveRoomEnabled ? 1 : 0,
-  });
+  const handleSaveAdmin   = () => updateWhiteLabel.mutate(adminForm);
+  const handleSaveLive    = async () => {
+    updateSettings.mutate({
+      liveRoomUrl:     liveForm.liveRoomUrl,
+      liveRoomTitle:   liveForm.liveRoomTitle,
+      liveRoomEnabled: liveForm.liveRoomEnabled ? 1 : 0,
+    });
+
+    // ── WhatsApp: notify all students when live room is turned ON ───────────
+    const waConf = getWAConfig();
+    if (waConf.enabled && liveForm.liveRoomEnabled && studentsList) {
+      const teacherName   = settings?.teacherName ?? 'الأستاذ';
+      const lectureTitle  = liveForm.liveRoomTitle || 'محاضرة مباشرة';
+      const lectureLink   = liveForm.liveRoomUrl   || '#';
+      const message = WA_TEMPLATES.liveStarted(teacherName, lectureTitle, lectureLink);
+      const phones = (studentsList as any[])
+        .map((s: any) => s.phone)
+        .filter(Boolean)
+        .map(normalizePhone);
+      if (phones.length > 0) {
+        toast.info(`📱 جاري إشعار ${phones.length} طالب ببدء البث...`);
+        const { sent, failed } = await sendWhatsAppBulk(phones, message);
+        toast.success(`✅ تم إرسال WhatsApp لـ ${sent} طالب${failed > 0 ? ` (${failed} فشل)` : ''}`);
+      }
+    }
+  };
 
   const handleAddTeacher = () => {
     if (!newTeacherForm.username || !newTeacherForm.password) {
@@ -481,6 +544,135 @@ export default function TeacherSettings() {
                 <Save className="w-4 h-4" />
                 حفظ إعدادات البث المباشر
               </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* ── WhatsApp Notifications ── */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+          <Card className="border-2 border-green-300 bg-gradient-to-br from-green-50/60 to-emerald-50/30">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2 text-green-800">
+                  <MessageCircle className="w-5 h-5 text-green-600" />
+                  إشعارات WhatsApp
+                </CardTitle>
+                <Badge variant="outline" className="gap-1 border-green-400 text-green-700 bg-green-50 font-medium">
+                  {waConfig.enabled ? '🟢 مفعّل' : '⚪ معطّل'}
+                </Badge>
+              </div>
+              <CardDescription className="text-xs text-green-700/80">
+                أرسل إشعارات تلقائية للطلاب على WhatsApp عند رفع درس جديد، بدء بث مباشر، أو تأكيد دفعة.
+                يعمل عبر خدمة <a href="https://ultramsg.com" target="_blank" rel="noopener noreferrer" className="underline font-medium">Ultramsg</a> (مجاني للتجربة).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+
+              {/* Enable Toggle */}
+              <div className="flex items-center justify-between p-3 bg-white/70 border border-green-200 rounded-xl">
+                <div>
+                  <p className="font-medium text-sm text-green-900">تفعيل إشعارات WhatsApp</p>
+                  <p className="text-xs text-muted-foreground">سيتم إرسال رسائل تلقائية عند الأحداث المهمة</p>
+                </div>
+                <Switch
+                  checked={waConfig.enabled}
+                  onCheckedChange={v => setWaConfig(p => ({ ...p, enabled: v }))}
+                  className="data-[state=checked]:bg-green-600"
+                />
+              </div>
+
+              {/* Credentials */}
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <Label className="text-green-800">Instance ID (من لوحة Ultramsg)</Label>
+                  <Input
+                    value={waConfig.instanceId}
+                    onChange={e => setWaConfig(p => ({ ...p, instanceId: e.target.value }))}
+                    className="mt-1 bg-white/80 border-green-200 focus:border-green-500"
+                    dir="ltr"
+                    placeholder="instance123456"
+                  />
+                </div>
+                <div>
+                  <Label className="text-green-800">Token (من لوحة Ultramsg)</Label>
+                  <div className="relative mt-1">
+                    <Input
+                      type={waTokenVisible ? 'text' : 'password'}
+                      value={waConfig.token}
+                      onChange={e => setWaConfig(p => ({ ...p, token: e.target.value }))}
+                      className="pl-10 bg-white/80 border-green-200 focus:border-green-500"
+                      dir="ltr"
+                      placeholder="••••••••••••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setWaTokenVisible(v => !v)}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {waTokenVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-green-800">رقم هاتف المعلم (لاستقبال رسائل الاختبار)</Label>
+                  <Input
+                    value={waConfig.teacherPhone}
+                    onChange={e => setWaConfig(p => ({ ...p, teacherPhone: e.target.value }))}
+                    className="mt-1 bg-white/80 border-green-200 focus:border-green-500"
+                    dir="ltr"
+                    placeholder="01012345678"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">سيُرسل إليه اختبار الاتصال — يُحوّل تلقائيًا للصيغة الدولية</p>
+                </div>
+              </div>
+
+              {/* Info box */}
+              <div className="p-3 bg-green-100/60 border border-green-200 rounded-lg text-xs text-green-800 space-y-1">
+                <p className="font-semibold">📋 الإشعارات التلقائية المتاحة:</p>
+                <ul className="space-y-0.5 pr-2">
+                  <li>📚 رفع درس جديد → إشعار لجميع الطلاب المسجلين</li>
+                  <li>🔴 بدء بث مباشر → إشعار فوري لكل الطلاب</li>
+                  <li>✅ نتيجة اختبار → إشعار للطالب بنتيجته</li>
+                  <li>💳 تأكيد دفعة → إشعار تأكيد للطالب</li>
+                </ul>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  onClick={handleSaveWA}
+                  size="sm"
+                  className="gap-2 bg-green-600 hover:bg-green-700 text-white shadow-md"
+                >
+                  <Save className="w-4 h-4" />
+                  حفظ إعدادات WhatsApp
+                </Button>
+                <Button
+                  onClick={handleTestWA}
+                  disabled={waTesting}
+                  size="sm"
+                  variant="outline"
+                  className="gap-2 border-green-400 text-green-700 hover:bg-green-50"
+                >
+                  {waTesting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : waTestSent ? (
+                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  {waTesting ? 'جاري الإرسال...' : waTestSent ? 'تم الإرسال!' : 'إرسال رسالة اختبار'}
+                </Button>
+                <a
+                  href="https://ultramsg.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-green-700 underline self-center"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  فتح لوحة Ultramsg
+                </a>
+              </div>
             </CardContent>
           </Card>
         </motion.div>
