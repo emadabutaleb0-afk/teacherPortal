@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { mockTestResults } from './mockData';
 
 // Dynamic mock state storage in memory to allow local mutations/queries to reflect changes
 const mockState: Record<string, any> = {
@@ -336,7 +337,17 @@ const createMockQuery = (path: string[]) => {
         }
       } else if (namespace === 'testTaking') {
         if (method === 'myResults') {
-          data = [
+          const myId = "801";
+          const myAttempts = mockTestResults.filter((r: any) => String(r.studentId) === myId);
+          data = myAttempts.length > 0 ? myAttempts.map(r => ({
+            id: r.id,
+            unitId: Number((r as any).unitId || 1),
+            testId: Number(r.testId),
+            score: r.score,
+            totalPoints: r.totalScore,
+            percentage: String(r.percentage),
+            passed: Number(r.percentage) >= 60,
+          })) : [
             { id: 901, unitId: 1, testId: 301, score: 4, totalPoints: 4, percentage: "100.00", passed: true }
           ];
         }
@@ -362,11 +373,38 @@ const createMockQuery = (path: string[]) => {
         const isFiltered = grade && grade !== 'all';
 
         if (method === 'studentRecommendation') {
-          data = {
-            recommendation: currentLang === "ar" 
-              ? "مجهود رائع! ينصح بالبدء في الوحدة الثانية للتركيز على مهارات القراءة واستخراج المعاني الجديدة."
-              : "Great job! It is recommended to start Unit 2 to focus on reading comprehension and vocabulary extraction."
-          };
+          const myId = "801";
+          const myAttempts = mockTestResults.filter((r: any) => String(r.studentId) === myId);
+
+          if (myAttempts.length === 0) {
+            data = {
+              recommendation: currentLang === "ar"
+                ? "أهلاً بك في منصتنا! نوصيك بالبدء في حضور دروس الوحدة الأولى وإجراء الاختبار القصير الأول لتحديد مستواك الحالي."
+                : "Welcome to our platform! We recommend starting with the lessons of Unit 1 and taking the first short quiz to assess your current level."
+            };
+          } else {
+            const worstAttempt = [...myAttempts].sort((a: any, b: any) => Number(a.percentage) - Number(b.percentage))[0];
+            const worstPercentage = Number(worstAttempt.percentage);
+
+            if (worstPercentage < 75) {
+              const testObj: any = Object.values(mockState.tests).flat().find((t: any) => String(t.id) === String(worstAttempt.testId)) || {};
+              const unitId = testObj.unitId || 1;
+              const unitObj = mockState.units.find((u: any) => u.id === unitId);
+              const unitTitle = unitObj ? (currentLang === "ar" ? unitObj.titleAr : unitObj.titleEn) : "الوحدة الأولى";
+
+              data = {
+                recommendation: currentLang === "ar"
+                  ? `بناءً على نتيجتك في "${testObj.titleAr || 'الاختبار'}" (${worstPercentage}%)، نوصي بشدة بمراجعة محتوى "${unitTitle}" وحل أسئلة التدريبات لرفع مستواك.`
+                  : `Based on your result in "${testObj.titleEn || 'the quiz'}" (${worstPercentage}%), we highly recommend reviewing the content of "${unitTitle}" and solving practice exercises to boost your score.`
+              };
+            } else {
+              data = {
+                recommendation: currentLang === "ar"
+                  ? "عمل رائع ومتميز! درجاتك ممتازة في جميع الاختبارات حتى الآن. استمر في تفوقك وننصحك بالبدء في دراسة الوحدة التالية."
+                  : "Great and outstanding work! Your scores are excellent on all tests so far. Keep up the good work and we recommend starting the next unit."
+              };
+            }
+          }
         } else if (method === 'dashboardStats') {
           const studList = isFiltered ? mockState.studentsList.filter((s: any) => s.gradeLevel === grade) : mockState.studentsList;
           const studIds = new Set(studList.map((s: any) => s.id));
@@ -374,10 +412,21 @@ const createMockQuery = (path: string[]) => {
           const totalRev = txns.filter((t: any) => t.status === 'success').reduce((sum: any, t: any) => sum + t.amountEgp, 0);
           const totalStud = studList.length;
           const pubUnits = mockState.units.filter((u: any) => u.isPublished && (!isFiltered || u.gradeLevel === grade)).length;
+          
+          const attempts = mockTestResults || [];
+          const filteredAttempts = isFiltered 
+            ? attempts.filter((a: any) => {
+                const student = mockState.studentsList.find((s: any) => s.id === a.studentId || String(s.id) === String(a.studentId));
+                return student?.gradeLevel === grade;
+              })
+            : attempts;
+          const scores = filteredAttempts.map((a: any) => Number(a.percentage)).filter(s => !isNaN(s));
+          const calculatedAvg = scores.length > 0 ? Math.round(scores.reduce((sum, s) => sum + s, 0) / scores.length) : 86;
+
           data = {
             totalRevenue: totalRev > 0 ? totalRev : (isFiltered ? (grade === "الصف الثالث الثانوي" ? 750 : 450) : 1200),
             totalStudents: totalStud,
-            avgTestScore: isFiltered ? (grade === "الصف الثالث الثانوي" ? 88 : grade === "الصف الثاني الثانوي" ? 82 : 79) : 86,
+            avgTestScore: calculatedAvg,
             publishedUnits: pubUnits,
             totalTests: isFiltered ? 8 : 24,
             completionRate: isFiltered ? 91 : 88,
@@ -385,20 +434,69 @@ const createMockQuery = (path: string[]) => {
             explanatoryLessons: isFiltered ? 14 : 42,
           };
         } else if (method === 'aiInsights') {
-          if (isFiltered) {
-            if (grade === "الصف الثالث الثانوي") {
-              data = { insight: currentLang === "en" ? "3rd Secondary students show high proficiency in Tenses (88%) but require practice on Advanced Deductive Reading." : "طلاب الصف الثالث الثانوي يظهرون تفوقاً في قواعد الأزمنة (88%) ولكنهم بحاجة لمزيد من التدريب على الاستنتاج المتقدم في نصوص القراءة." };
-            } else if (grade === "الصف الثاني الثانوي") {
-              data = { insight: currentLang === "en" ? "2nd Secondary students are making steady progress in Vocabulary, with a slight dip in Conditional Sentences." : "طلاب الصف الثاني الثانوي يحرزون تقدماً مستقراً في المفردات، مع وجود بعض الملاحظات في قاعدة الجمل الشرطية." };
-            } else {
-              data = { insight: currentLang === "en" ? "1st Secondary students are adapting well to the foundational grammar curriculum." : "طلاب الصف الأول الثانوي يتأقلمون بشكل جيد مع منهج القواعد الأساسي للمرحلة الثانوية." };
-            }
-          } else {
+          const attempts = mockTestResults || [];
+          const filteredAttempts = isFiltered 
+            ? attempts.filter((a: any) => {
+                const student = mockState.studentsList.find((s: any) => s.id === a.studentId || String(s.id) === String(a.studentId));
+                return student?.gradeLevel === grade;
+              })
+            : attempts;
+
+          if (filteredAttempts.length === 0) {
             data = {
-              insight: currentLang === "en" 
-                ? "Students are performing exceptionally well in Present Perfect Tense (88% success), but show difficulty in Past Continuous and Irregular Verbs. Recommendation: Provide focused bite-sized interactive quizzes on irregular past participles." 
-                : "أداء الطلاب ممتاز في قاعدة المضارع التام (نسبة نجاح 88%)، ولكن يلاحظ وجود صعوبة في قاعدة الماضي المستمر والأفعال الشاذة. التوصية: تخصيص اختبارات قصيرة تركز على تصريف الأفعال الشاذة."
+              insight: currentLang === "en"
+                ? "No test attempts recorded for this grade level yet. Once students submit their answers, AI will analyze common pitfalls."
+                : "لا توجد محاولات اختبار مسجلة لهذا الصف بعد. بمجرد قيام الطلاب بحل الاختبارات، سيقوم الذكاء الاصطناعي بتحليل الأخطاء الشائعة."
             };
+          } else {
+            const avg = Math.round(filteredAttempts.reduce((sum: number, a: any) => sum + Number(a.percentage), 0) / filteredAttempts.length);
+            const studentAverages: Record<string, { sum: number; count: number }> = {};
+            filteredAttempts.forEach((a: any) => {
+              const sId = String(a.studentId);
+              if (!studentAverages[sId]) studentAverages[sId] = { sum: 0, count: 0 };
+              studentAverages[sId].sum += Number(a.percentage);
+              studentAverages[sId].count += 1;
+            });
+            const atRisk = Object.values(studentAverages).filter(s => (s.sum / s.count) < 60).length;
+
+            const testScores: Record<string, { sum: number; count: number }> = {};
+            filteredAttempts.forEach((a: any) => {
+              const tId = String(a.testId);
+              if (!testScores[tId]) testScores[tId] = { sum: 0, count: 0 };
+              testScores[tId].sum += Number(a.percentage);
+              testScores[tId].count += 1;
+            });
+            let worstTestId = "";
+            let worstAvg = 100;
+            Object.entries(testScores).forEach(([tId, stats]) => {
+              const avg = stats.sum / stats.count;
+              if (avg < worstAvg) {
+                worstAvg = avg;
+                worstTestId = tId;
+              }
+            });
+
+            const allTests = Object.values(mockState.tests).flat() as any[];
+            const worstTestObj = allTests.find((t: any) => String(t.id) === worstTestId);
+            const worstTestTitle = worstTestObj ? (currentLang === "ar" ? worstTestObj.titleAr : worstTestObj.titleEn) : "";
+
+            let insightText = "";
+            if (currentLang === "ar") {
+              insightText = `المعدل العام لأداء الطلاب هو ${avg}%. تم الكشف عن ${atRisk} من الطلاب في حالة تحصيل ضعيف (أقل من 60%).`;
+              if (worstTestTitle) {
+                insightText += ` يظهر التحليل أن الاختبار الأكثر صعوبة هو "${worstTestTitle}" بمتوسط ${Math.round(worstAvg)}%. ننصح بالتركيز على مراجعة المفاهيم المتعلقة بهذا الاختبار في المحاضرة القادمة.`;
+              } else {
+                insightText += ` أداء الطلاب العام مستقر ومطمئن.`;
+              }
+            } else {
+              insightText = `The average student score is ${avg}%. There are ${atRisk} students identified with low performance (below 60%).`;
+              if (worstTestTitle) {
+                insightText += ` Analysis shows the most challenging exam is "${worstTestTitle}" with an average of ${Math.round(worstAvg)}%. We recommend focusing on reviewing concepts related to this exam in the next lecture.`;
+              } else {
+                insightText += ` Overall student performance is stable and satisfactory.`;
+              }
+            }
+            data = { insight: insightText };
           }
         } else if (method === 'testPerformance') {
           if (grade === "الصف الثالث الثانوي") {
@@ -903,64 +1001,165 @@ const createMockQuery = (path: string[]) => {
             }
             if (method === 'generateAIQuestions') {
               const sample = (variables.sampleQuestion || "").trim();
-              let baseSentence = sample;
-              let choices = ["finishes", "has finished", "had finished", "is finishing"];
-
-              const match = sample.match(/(.*?)\(([^\)]+)\)(.*)/);
-              if (match) {
-                baseSentence = (match[1] + match[3]).trim();
-                const parts = match[2].split(",").map((s: string) => s.trim()).filter(Boolean);
-                if (parts.length >= 4) {
-                  choices = parts.slice(0, 4);
-                } else if (parts.length > 0) {
-                  choices = [parts[0], parts[1] || "has finished", parts[2] || "had finished", parts[3] || "is finishing"];
+              
+              const generateQuestionsForTopic = (topic: string, sampleText: string) => {
+                if (topic === "present_perfect") {
+                  return [
+                    {
+                      questionText: "Choose the correct answer: We _______ each other since we were children.",
+                      optionA: "know",
+                      optionB: "have known",
+                      optionC: "had known",
+                      optionD: "are knowing",
+                      correctOption: "B",
+                      explanation: "التفسير: رابط الزمن 'since' يربط بين جملتين، قبله مضارع تام (have known) وبعده ماضي بسيط.",
+                      points: 1
+                    },
+                    {
+                      questionText: "Choose the correct answer: She _______ her homework yet.",
+                      optionA: "didn't finish",
+                      optionB: "hasn't finished",
+                      optionC: "finish",
+                      optionD: "wasn't finishing",
+                      correctOption: "B",
+                      explanation: "التفسير: كلمة 'yet' تأتي في نهاية الجملة المنفية في زمن المضارع التام (hasn't + PP).",
+                      points: 1
+                    },
+                    {
+                      questionText: "Choose the correct answer: I _______ to London twice this year, but I want to go again.",
+                      optionA: "have been",
+                      optionB: "have gone",
+                      optionC: "went",
+                      optionD: "was",
+                      correctOption: "A",
+                      explanation: "التفسير: نستخدم 'have been' للتعبير عن الذهاب لمكان والعودة منه، بينما 'have gone' تعني الذهاب وعدم العودة بعد.",
+                      points: 2
+                    }
+                  ];
+                } else if (topic === "past_continuous") {
+                  return [
+                    {
+                      questionText: "Choose the correct answer: While I _______ my breakfast, the doorbell rang.",
+                      optionA: "had",
+                      optionB: "was having",
+                      optionC: "have had",
+                      optionD: "am having",
+                      correctOption: "B",
+                      explanation: "التفسير: رابط الزمن 'While' يتبعه ماضي مستمر (was/were + V-ing) لحدث طويل قطعه حدث آخر بسيط.",
+                      points: 1
+                    },
+                    {
+                      questionText: "Choose the correct answer: What _______ you doing when I called you yesterday?",
+                      optionA: "did",
+                      optionB: "were",
+                      optionC: "was",
+                      optionD: "are",
+                      correctOption: "B",
+                      explanation: "التفسير: صيغة السؤال في الماضي المستمر تتطلب فعل مساعد (were) مع الفاعل (you) والفعل المضاف له ing.",
+                      points: 1
+                    },
+                    {
+                      questionText: "Choose the correct answer: As she _______ the road, she dropped her keys.",
+                      optionA: "crossed",
+                      optionB: "was crossing",
+                      optionC: "had crossed",
+                      optionD: "crosses",
+                      correctOption: "B",
+                      explanation: "التفسير: الرابط 'As' مثل 'While' يتبعه ماضي مستمر للتعبير عن حدث مستمر قطعه حدث آخر.",
+                      points: 2
+                    }
+                  ];
+                } else if (topic === "conditionals") {
+                  return [
+                    {
+                      questionText: "Choose the correct answer: If you mix yellow and blue, you _______ green.",
+                      optionA: "would get",
+                      optionB: "get",
+                      optionC: "will get",
+                      optionD: "got",
+                      correctOption: "B",
+                      explanation: "التفسير: الحالة الصفرية (Zero Conditional) تعبر عن الحقائق العلمية والثابتة (مضارع بسيط يقابله مضارع بسيط).",
+                      points: 1
+                    },
+                    {
+                      questionText: "Choose the correct answer: If I _______ a million dollars, I would travel around the world.",
+                      optionA: "have",
+                      optionB: "had",
+                      optionC: "would have",
+                      optionD: "had had",
+                      correctOption: "B",
+                      explanation: "التفسير: الحالة الثانية (If + ماضي بسيط يقابلها would + المصدر) للتعبير عن مواقف خيالية في الحاضر.",
+                      points: 1
+                    },
+                    {
+                      questionText: "Choose the correct answer: If we _______ earlier, we wouldn't have missed the train.",
+                      optionA: "left",
+                      optionB: "had left",
+                      optionC: "would leave",
+                      optionD: "were leaving",
+                      correctOption: "B",
+                      explanation: "التفسير: الحالة الثالثة (If + ماضي تام يقابلها would have + PP) للتعبير عن ندم أو استحالة تغيير حدث بالماضي.",
+                      points: 2
+                    }
+                  ];
+                } else {
+                  const match = sampleText.match(/(.*?)\(([^\)]+)\)(.*)/);
+                  let baseSentence = sampleText;
+                  let choices = ["option A", "option B", "option C", "option D"];
+                  if (match) {
+                    baseSentence = (match[1] + match[3]).trim();
+                    const parts = match[2].split(",").map((s: string) => s.trim()).filter(Boolean);
+                    if (parts.length >= 4) choices = parts.slice(0, 4);
+                  }
+                  return [
+                    {
+                      questionText: `Choose the correct answer: Ali ${baseSentence.replace(/I /gi, 'Ali ').replace(/she /gi, 'Ahmed ').replace(/Choose the correct answer:/gi, '')}`,
+                      optionA: choices[0] || "option A",
+                      optionB: choices[1] || "option B",
+                      optionC: choices[2] || "option C",
+                      optionD: choices[3] || "option D",
+                      correctOption: "C",
+                      explanation: "التفسير: تم توليد هذا السؤال بناءً على التوافق الزمني والقواعد المستنتجة من النموذج المدخل.",
+                      points: 1
+                    },
+                    {
+                      questionText: `Choose the correct answer: They ${baseSentence.replace(/yesterday/gi, 'last week').replace(/already/gi, 'just').replace(/Choose the correct answer:/gi, '')}`,
+                      optionA: choices[0] || "option A",
+                      optionB: choices[1] || "option B",
+                      optionC: choices[2] || "option C",
+                      optionD: choices[3] || "option D",
+                      correctOption: "B",
+                      explanation: "التفسير: تم توليد هذا السؤال مع تغيير الكلمات الدالة للحفاظ على بنية قاعدة الجملة الأصلية.",
+                      points: 1
+                    },
+                    {
+                      questionText: "Choose the correct answer: By the time they arrived at the station, the train _______.",
+                      optionA: "already left",
+                      optionB: "had already left",
+                      optionC: "has left",
+                      optionD: "was leaving",
+                      correctOption: "B",
+                      explanation: "التفسير: الماضي التام (had + PP) يعبر عن الحدث الذي وقع أولاً في الزمن الماضي قبل حدث آخر.",
+                      points: 2
+                    }
+                  ];
                 }
+              };
+
+              let topic = "general";
+              const lowerSample = sample.toLowerCase();
+              if (lowerSample.includes("since") || lowerSample.includes("already") || lowerSample.includes("yet") || lowerSample.includes("have finished") || lowerSample.includes("has ")) {
+                topic = "present_perfect";
+              } else if (lowerSample.includes("while") || lowerSample.includes("when ") || lowerSample.includes("was ") || lowerSample.includes("were ")) {
+                topic = "past_continuous";
+              } else if (lowerSample.includes("if ") || lowerSample.includes("had studied") || lowerSample.includes("would ")) {
+                topic = "conditionals";
               }
 
               const res = {
-                questions: [
-                  {
-                    questionText: `Choose the correct answer: ${baseSentence}`,
-                    optionA: choices[0] || "finishes",
-                    optionB: choices[1] || "has finished",
-                    optionC: choices[2] || "had finished",
-                    optionD: choices[3] || "is finishing",
-                    correctOption: "C",
-                    explanation: "التفسير: الإجابة الصحيحة تتوافق مع التوافق الزمني للجملة وسياق الحدث المطلوب.",
-                    points: 1
-                  },
-                  {
-                    questionText: "Choose the correct answer: By the time the police arrived, the burglar _______ out of the window.",
-                    optionA: "already jumped",
-                    optionB: "had already jumped",
-                    optionC: "has already jumped",
-                    optionD: "was jumping",
-                    correctOption: "B",
-                    explanation: "التفسير: رابط الزمن By the time يتبعه ماضي بسيط، والحدث الأول في الجملة الثانية يكون ماضي تام (had + PP).",
-                    points: 1
-                  },
-                  {
-                    questionText: "Choose the correct answer: If she had studied harder last year, she _______ the final exam easily.",
-                    optionA: "would pass",
-                    optionB: "will pass",
-                    optionC: "would have passed",
-                    optionD: "passed",
-                    correctOption: "C",
-                    explanation: "التفسير: الحالة الثالثة من قاعدة If (ماضي تام يقابله would have + PP) للتعبير عن استحالة حدوث شيء في الماضي.",
-                    points: 2
-                  },
-                  {
-                    questionText: "Choose the correct answer: No sooner _______ the door than the phone started ringing.",
-                    optionA: "she had closed",
-                    optionB: "did she close",
-                    optionC: "had she closed",
-                    optionD: "she closes",
-                    correctOption: "C",
-                    explanation: "التفسير: عند البدء بـ No sooner يتقدم الفعل المساعد على الفاعل على صيغة سؤال (had + subject + PP).",
-                    points: 2
-                  }
-                ]
+                questions: generateQuestionsForTopic(topic, sample)
               };
+
               if (options?.onSuccess) options.onSuccess(res);
               return;
             }
@@ -1007,6 +1206,37 @@ const createMockQuery = (path: string[]) => {
               totalQuestions,
               feedback,
             };
+
+            const newAttempt = {
+              id: `tr-${Date.now()}`,
+              studentId: "801",
+              testId: String(tId),
+              testTitle: testObj.titleAr || "اختبار شامل",
+              subject: "English",
+              score: correctCount,
+              totalScore: totalQuestions,
+              percentage,
+              timeTaken: 120,
+              completedAt: new Date().toISOString(),
+              answers: userAnswers,
+              strengths: percentage >= 80 ? ["قواعد الأزمنة"] : [],
+              weaknesses: percentage < 60 ? ["بنية الجمل"] : [],
+            };
+
+            mockTestResults.unshift(newAttempt);
+
+            fetch('/api/test-results', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newAttempt)
+            }).then(response => {
+              if (response.ok) {
+                console.log('✅ Test result saved to backend DB');
+                invalidateMockQueries();
+              }
+            }).catch(err => {
+              console.error('❌ Failed to save test result:', err);
+            });
 
             if (options?.onSuccess) options.onSuccess(res);
             return;

@@ -1,7 +1,7 @@
 export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
 export const getRelativePath = (path: string) => {
-  const base = import.meta.env.DEV ? "" : "/teacherPortal";
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   return `${base}${path}`;
 };
 

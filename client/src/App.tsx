@@ -1,6 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Route, Switch, Router as WouterRouter } from "wouter";
+import { Route, Switch, Router as WouterRouter, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -53,6 +53,9 @@ function Router() {
       {/* Registration & Auth */}
       <Route path="/register" component={RegisterPage} />
       <Route path="/signin" component={SignInPage} />
+      <Route path="/login">
+        <Redirect to="/signin" />
+      </Route>
 
       <Route component={NotFound} />
     </Switch>
@@ -60,7 +63,7 @@ function Router() {
 }
 
 function App() {
-  const base = import.meta.env.DEV ? "" : "/teacherPortal";
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light" switchable={true}>
